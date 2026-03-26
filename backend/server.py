@@ -12,6 +12,7 @@ import subprocess
 import asyncio
 import httpx
 import websockets
+import requests
 from websockets.exceptions import ConnectionClosed
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -62,6 +63,61 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ================== OPENROUTER LLM ==================
+
+import requests
+
+def ask_openrouter(prompt: str):
+    if not os.getenv("OPENROUTER_API_KEY"):
+        raise HTTPException(status_code=500, detail="Missing OPENROUTER_API_KEY")
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://your-app.com",
+                "X-Title": "OpenClaw"
+            },
+            json={
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            },
+            timeout=30
+        )
+
+        data = response.json()
+
+        try:
+            return data["choices"][0]["message"]["content"]
+        except Exception:
+            logger.error(f"Invalid OpenRouter response: {data}")
+            raise HTTPException(status_code=500, detail="Invalid LLM response")
+
+    except Exception as e:
+        logger.error(f"OpenRouter error: {e}")
+        raise HTTPException(status_code=500, detail="LLM request failed")
+
+
+# ================== REQUEST MODEL ==================
+
+class ChatRequest(BaseModel):
+    prompt: str
+
+
+# ================== API ENDPOINT ==================
+
+@api_router.post("/llm/chat")
+async def chat_with_llm(req: ChatRequest):
+    result = ask_openrouter(req.prompt)
+    return {
+        "ok": True,
+        "response": result
+    }
+
 
 # ============== Pydantic Models ==============
 
@@ -109,6 +165,10 @@ class User(BaseModel):
 
 class SessionRequest(BaseModel):
     session_id: str
+
+
+class ChatRequest(BaseModel):
+    prompt: str
 
 
 # ============== Authentication Helpers ==============
@@ -349,6 +409,22 @@ async def logout(request: Request, response: Response):
     )
 
     return {"ok": True, "message": "Logged out"}
+
+
+@api_router.post("/llm/chat")
+async def chat_with_llm(req: ChatRequest):
+    """
+    Simple OpenRouter chat endpoint
+    """
+    if not os.getenv("OPENROUTER_API_KEY"):
+        raise HTTPException(status_code=500, detail="Missing OPENROUTER_API_KEY")
+
+    result = ask_openrouter(req.prompt)
+
+    return {
+        "ok": True,
+        "response": result
+    }
 
 
 # ============== Moltbot Helpers ==============
