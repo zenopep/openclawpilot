@@ -78,36 +78,52 @@ def extract_email_from_website(url: str) -> str:
 # OUTREACH AGENT (COMPATIBILE CON LEAD REALI)
 # =========================
 def outreach_agent(leads: List[Dict]) -> Dict:
-    messages = []
+    results = []
 
     for lead in leads:
-        name = lead.get("name", "azienda")
-        email = lead.get("email", "N/A")
+        name = lead.get("name")
+        email = lead.get("email")
 
-        messages.append({
+        if not email:
+            continue
+
+        prompt = f"""
+Write a short cold email for this company:
+
+{name}
+
+Context:
+- Location: Barcelona
+- Project: free water bottles for tourists funded by sponsors
+- Goal: partnership for distribution
+
+Language:
+- Use English as default
+- If the company is clearly Spanish/local, you may use Spanish
+
+Tone:
+- direct
+- business
+- concise
+"""
+
+        body = ask_openrouter(prompt)
+
+        subject = "Partnership opportunity in Barcelona tourism"
+
+        sent = send_email(email, subject, body)
+
+        results.append({
             "name": name,
             "email": email,
-            "message": f"""
-Oggetto: Partnership distribuzione acqua gratuita a Barcellona
-
-Ciao {name},
-
-stiamo lanciando un progetto ad alto impatto nel settore turistico:
-distribuzione gratuita di acqua ai visitatori, sostenuta da brand sponsor.
-
-Stiamo selezionando partner locali per distribuire le bottigliette.
-
-Ti va di parlarne 10 minuti?
-
-— Gennaro
-"""
+            "sent": sent,
+            "preview": body[:120]
         })
 
     return {
         "agent": "Outreach Agent",
-        "messages": messages
+        "results": results
     }
-
 # =========================
 # SALES AGENT (STRATEGIA)
 # =========================
