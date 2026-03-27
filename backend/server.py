@@ -66,41 +66,56 @@ logger = logging.getLogger(__name__)
 # ================== OPENROUTER LLM ==================
 
 import requests
+import os
+from fastapi import HTTPException
 
 def ask_openrouter(prompt: str):
-    if not os.getenv("OPENROUTER_API_KEY"):
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+    if not api_key:
         raise HTTPException(status_code=500, detail="Missing OPENROUTER_API_KEY")
 
     try:
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://your-app.com",
-                "X-Title": "OpenClaw"
             },
             json={
                 "model": "openai/gpt-4o-mini",
                 "messages": [
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "Sei un assistente AI esperto di marketing, crescita e automazione. Rispondi in modo chiaro, strategico e orientato ai risultati."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
                 ]
             },
             timeout=30
         )
 
+        # 🔴 errore API (crediti finiti, key sbagliata, ecc)
+        if response.status_code != 200:
+            logger.error(f"OpenRouter API error: {response.text}")
+            raise HTTPException(status_code=500, detail="OpenRouter API error")
+
         data = response.json()
 
+        # 🔴 parsing risposta
         try:
             return data["choices"][0]["message"]["content"]
-        except Exception:
-            logger.error(f"Invalid OpenRouter response: {data}")
+
+        except (KeyError, IndexError, TypeError):
+            logger.error(f"Invalid OpenRouter response structure: {data}")
             raise HTTPException(status_code=500, detail="Invalid LLM response")
 
-    except Exception as e:
-        logger.error(f"OpenRouter error: {e}")
-        raise HTTPException(status_code=500, detail="LLM request failed")
-
+    except requests.exceptions.RequestException as e:
+        logger.error(f"OpenRouter connection error: {e}")
+        raise HTTPException(status_code=500, detail="LLM connection failed")
 
 # ================== REQUEST MODEL ==================
 
