@@ -140,12 +140,14 @@ async def gennaro_orchestrator(req: ChatRequest):
     prompt = req.prompt.lower()
 
     if "lead" in prompt or "distributori" in prompt:
-        leads = lead_agent(prompt)
-        outreach = outreach_agent(leads["output"])
+        leads_data = lead_agent(prompt)
+        leads_list = leads_data.get("output", [])
+
+        outreach = outreach_agent(leads_list)
 
         return {
-            "gennaro": "Ho trovato lead e preparato outreach",
-            "leads": leads,
+            "gennaro": "Lead trovati e outreach pronto",
+            "leads": leads_data,
             "outreach": outreach
         }
 
