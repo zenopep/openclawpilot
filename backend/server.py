@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
+from agents import lead_agent, outreach_agent, sales_agent
 
 # WhatsApp monitoring
 from whatsapp_monitor import get_whatsapp_status, fix_registered_flag
@@ -133,6 +134,36 @@ async def chat_with_llm(req: ChatRequest):
         "response": result
     }
 
+@api_router.post("/agent/gennaro")
+async def gennaro_orchestrator(req: ChatRequest):
+
+    prompt = req.prompt.lower()
+
+    if "lead" in prompt or "distributori" in prompt:
+        leads = lead_agent(prompt)
+        outreach = outreach_agent(leads["output"])
+
+        return {
+            "gennaro": "Ho trovato lead e preparato outreach",
+            "leads": leads,
+            "outreach": outreach
+        }
+
+    elif "vendere" in prompt or "sponsor" in prompt:
+        sales = sales_agent()
+
+        return {
+            "gennaro": "Strategia vendita pronta",
+            "sales": sales
+        }
+
+    else:
+        # fallback → LLM
+        response = ask_openrouter(req.prompt)
+
+        return {
+            "gennaro": response
+        }
 
 # ============== Pydantic Models ==============
 
